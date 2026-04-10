@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mandated Tasks – Connect the Pairs</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background: #f5f5f5;
+    }
+    h1 { text-align: center; }
+
+    #timer {
+        font-size: 22px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 20px;
+        color: #d9534f;
+    }
+
+    #progress-container {
+        width: 100%;
+        background: #ddd;
+        height: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    #progress-bar {
+        height: 20px;
+        width: 0%;
+        background: #5cb85c;
+        border-radius: 10px;
+    }
+
+    #gameArea {
+        position: relative;
+        min-height: 650px;
+    }
+
+    .container {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        position: relative;
+    }
+
+    .column {
+        width: 48%;
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        min-height: 500px;
+        position: relative;
+        z-index: 2;
+    }
+
+    .task, .definition {
+        padding: 10px;
+        margin: 10px 0;
+        background: #e9ecef;
+        border-radius: 5px;
+        cursor: pointer;
+        border: 3px solid transparent;
+        transition: background 0.2s, border-color 0.2s;
+    }
+
+    .selected {
+        border-color: #0275d8;
+        background: #d9edf7;
+    }
+
+    .task.correct { background: #c8f7c5 !important; border-color: #3c763d !important; }
+    .task.wrong { background: #f7c5c5 !important; border-color: #a94442 !important; }
+
+    #lines {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 9999;
+        pointer-events: none;
+    }
+
+    button {
+        margin-top: 20px;
+        padding: 12px 25px;
+        background: #0275d8;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+</style>
+
+</head>
+<body>
+
+<h1>Mandated Tasks – Connect the Pairs</h1>
+
+<div id="timer">Time: 15:00</div>
+
+<div id="progress-container">
+    <div id="progress-bar"></div>
+</div>
+
+<form method="POST" id="gameForm">
+
+<div class="container" id="gameArea">
+
+    <svg id="lines"></svg>
+
+    <div class="column" id="tasks">
+        <h3>Mandated Tasks</h3>
+
+        {% for term in pairs %}
+        <div class="task" data-term="{{ term }}">
+            <strong>{{ term }}</strong>
+            <input type="hidden" name="{{ term }}" value="">
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="column" id="definitions">
+        <h3>Definitions</h3>
+
+        {% for d in definitions %}
+        <div class="definition" data-value="{{ d }}">
+            {{ d }}
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<button type="submit">Submit</button>
+
+</form>
+
+{% if score is not none %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const correctPairs = {{ pairs|tojson }};
+    const userMatches = {{ user_matches|tojson }};
+
+    document.querySelectorAll(".task").forEach(task => {
+        const term = task.dataset.term;
+        const userAnswer = userMatches[term];
+        const correctAnswer = correctPairs[term];
+
+        if (userAnswer === correctAnswer) {
+            task.classList.add("correct");
+        } else {
+            task.classList.add("wrong");
+            task.innerHTML += "<br><em>Correct: " + correctAnswer + "</em>";
+        }
+    });
+});
+</script>
+
+<div style="text-align:center; margin-top:20px;">
+    <h2>Score: {{ score }} / {{ pairs|length }}</h2>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    const colors = [
+        "#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4",
+        "#46f0f0","#f032e6","#bcf60c","#fabebe","#008080","#e6beff",
+        "#9a6324","#fffac8","#800000","#aaffc3"
+    ];
+
+    let selected = null;
+    let connections = {};
+    let lines = {};
+
+    const gameArea = document.getElementById("gameArea");
+    const svg = document.getElementById("lines");
+
+    svg.setAttribute("width", gameArea.offsetWidth);
+    svg.setAttribute("height", gameArea.offsetHeight);
+
+    gameArea.addEventListener("click", function (e) {
+        let el = e.target;
+
+        if (el.tagName === "STRONG") {
+            el = el.parentElement;
+        }
+
+        if (!el.classList.contains("task") && !el.classList.contains("definition")) {
+            return;
+        }
+
+        handleSelect(el);
+    });
+
+    function handleSelect(el) {
+        if (selected === el) {
+            el.classList.remove("selected");
+            selected = null;
+            return;
+        }
+
+        if (!selected) {
+            selected = el;
+            el.classList.add("selected");
+            return;
+        }
+
+        if (selected.classList.contains("task") && el.classList.contains("definition")) {
+            connect(selected, el);
+        } else if (selected.classList.contains("definition") && el.classList.contains("task")) {
+            connect(el, selected);
+        } else {
+            selected.classList.remove("selected");
+            selected = el;
+            el.classList.add("selected");
+            return;
+        }
+
+        selected.classList.remove("selected");
+        selected = null;
+    }
+
+    function connect(task, definition) {
+        const term = task.dataset.term;
+        const value = definition.dataset.value;
+
+        const color = colors[Object.keys(lines).length % colors.length];
+
+        task.style.borderColor = color;
+        definition.style.borderColor = color;
+
+        task.style.backgroundColor = "#f0f8ff";
+        definition.style.backgroundColor = "#f0f8ff";
+
+        connections[term] = value;
+        task.querySelector("input").value = value;
+
+        drawLine(task, definition, term, color);
+        updateProgress();
+    }
+
+    function drawLine(task, definition, term, color) {
+        const rect1 = task.getBoundingClientRect();
+        const rect2 = definition.getBoundingClientRect();
+        const container = gameArea.getBoundingClientRect();
+
+        const x1 = rect1.right - container.left;
+        const y1 = rect1.top + rect1.height/2 - container.top;
+
+        const x2 = rect2.left - container.left;
+        const y2 = rect2.top + rect2.height/2 - container.top;
+
+        if (lines[term]) lines[term].remove();
+
+        const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+        line.setAttribute("x1", x1);
+        line.setAttribute("y1", y1);
+        line.setAttribute("x2", x2);
+        line.setAttribute("y2", y2);
+        line.setAttribute("stroke", color);
+        line.setAttribute("stroke-width", "4");
+
+        svg.appendChild(line);
+        lines[term] = line;
+    }
+
+    function updateProgress() {
+        const total = {{ pairs|length }};
+        const filled = Object.keys(connections).length;
+        const percent = (filled / total) * 100;
+        document.getElementById("progress-bar").style.width = percent + "%";
+    }
+
+    let timeLeft = 15 * 60;
+
+    function updateTimer() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+
+        document.getElementById("timer").innerText =
+            "Time: " + minutes + ":" + (seconds < 10 ? "0" + seconds : seconds);
+
+        if (timeLeft <= 0) {
+            document.getElementById("gameForm").submit();
+        } else {
+            timeLeft--;
+            setTimeout(updateTimer, 1000);
+        }
+    }
+
+    updateTimer();
+});
+</script>
+
+</body>
+</html>
