@@ -3,9 +3,6 @@ import random
 
 app = Flask(__name__)
 
-# ----------------------------------------------------
-# 1. Game data (16 tasks + 16 definitions)
-# ----------------------------------------------------
 pairs = {
     "Security sector reform (SSR)": "Providing security and maintaining public order to protect people, property and State institutions.",
     "Provision of a security umbrella": "Actions to gather information on whether an agreement to stop fighting is being respected.",
@@ -25,45 +22,39 @@ pairs = {
     "Stabilization support": "Helping restore basic security and functioning governance after conflict."
 }
 
-# ----------------------------------------------------
-# 2. Route GET + POST
-# ----------------------------------------------------
 @app.route("/", methods=["GET", "POST"])
 def index():
     tasks = list(pairs.keys())
     definitions = list(pairs.values())
 
-    # Shuffle for display
     random.shuffle(tasks)
     random.shuffle(definitions)
 
     if request.method == "POST":
         user_matches = request.form.to_dict()
-        score = 0
-        total = len(pairs)
-
-        for task, definition in user_matches.items():
-            if pairs.get(task) == definition:
-                score += 1
+        score = sum(1 for t, d in user_matches.items() if pairs.get(t) == d)
 
         return render_template(
             "index.html",
             tasks=tasks,
             definitions=definitions,
             score=score,
-            total=total,
-            submitted=True
+            total=len(pairs),
+            submitted=True,
+            pairs=pairs,
+            user_matches=user_matches
         )
 
+    # GET request
     return render_template(
         "index.html",
         tasks=tasks,
         definitions=definitions,
-        submitted=False
+        score=None,
+        submitted=False,
+        pairs=pairs,
+        user_matches={}
     )
 
-# ----------------------------------------------------
-# 3. Run app (Render uses gunicorn, but this is fine)
-# ----------------------------------------------------
 if __name__ == "__main__":
     app.run(debug=True)
